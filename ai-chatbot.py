@@ -19,13 +19,14 @@ import random
 import dotenv
 import streamlit as st
 import boto3
+import sys
 from botocore.exceptions import ClientError
 from typing import Dict, List, Optional, Any, Generator, Tuple, Union
 from datetime import datetime
 
 # LaunchDarkly imports
 import ldclient
-from ldclient import Context
+from ldclient.context import Context
 from ldclient.config import Config
 from ldai.client import LDAIClient, AIConfig, ModelConfig, LDMessage, ProviderConfig
 from ldai.tracker import FeedbackKind
@@ -33,6 +34,17 @@ from ldai.tracker import FeedbackKind
 # Set up logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
+
+# ------------------------------------------------------------------
+#  GLOBAL RUN-SCOPED SEED  (re-evaluated on every browser session)
+# ------------------------------------------------------------------
+if "RUN_SEED" not in st.session_state:
+    st.session_state.RUN_SEED = random.randint(1, 10)
+    logger.info(f"Generated NEW run-seed: {st.session_state.RUN_SEED}")
+else:
+    logger.debug(f"Reusing existing run-seed: {st.session_state.RUN_SEED}")
+
+SEED = st.session_state.RUN_SEED 
 
 # Load environment variables
 dotenv.load_dotenv()
@@ -423,6 +435,7 @@ def main():
             st.write(f"Premium: ${st.session_state.saved_user_info['premium']}")
             st.write(f"Policy Start: {st.session_state.saved_user_info['policy_start']}")
             st.write(f"Policy End: {st.session_state.saved_user_info['policy_end']}")
+            st.write(f"Seed (this run): {SEED}")
             
             # Create function to update profile
             def update_profile():
@@ -480,6 +493,7 @@ def main():
                         .set("premium", st.session_state.temp_premium) \
                         .set("policy_start", st.session_state.temp_policy_start) \
                         .set("policy_end", st.session_state.temp_policy_end) \
+                        .set("seed", SEED) \
                         .build()
                     ldclient.get().identify(new_context)
 
@@ -500,6 +514,7 @@ def main():
                 .set("premium", st.session_state.saved_user_info["premium"]) \
                 .set("policy_start", st.session_state.saved_user_info["policy_start"]) \
                 .set("policy_end", st.session_state.saved_user_info["policy_end"]) \
+                .set("seed", SEED) \
                 .build()
 
             variables = { 
@@ -697,33 +712,34 @@ def main():
 
 def ld_send_feedback(tracker, is_positive, message_index):
     """
-    Send feedback to LaunchDarkly.
-    
-    Args:
-        tracker: LaunchDarkly tracker object
-        is_positive: Whether feedback is positive
-        message_index: Index of the message receiving feedback
+    Send thumbs-up / thumbs-down to LaunchDarkly and flush immediately.
     """
     try:
-        # Get the LaunchDarkly client instance
-        ld_client = LaunchDarklyClient(
-            server_key=os.getenv("LD_SERVER_KEY"),
-            ai_config_id=os.getenv("LD_AI_CONFIG_ID")
+        if tracker is None:
+            logger.warning("No tracker — LaunchDarkly unavailable when config was fetched.")
+            return
+
+        # 1) record the signal
+        tracker.track_feedback(
+            {"kind": FeedbackKind.Positive if is_positive else FeedbackKind.Negative}
         )
-        ld_client.send_feedback(tracker, is_positive)
-        
-        # Log the feedback for debugging
-        logger.info(f"Feedback sent to LaunchDarkly: {'positive' if is_positive else 'negative'}")
-        
-        # Store the feedback in session state for display
-        if 'feedback_status' not in st.session_state:
-            st.session_state['feedback_status'] = {}
-        st.session_state['feedback_status'][message_index] = {
-            'submitted': True,
-            'value': is_positive
+
+        # 2) force an immediate flush so it appears in the LD UI right away
+        ldclient.get().flush()
+
+        # 3) reflect status in session (unchanged)
+        if "feedback_status" not in st.session_state:
+            st.session_state["feedback_status"] = {}
+        st.session_state["feedback_status"][message_index] = {
+            "submitted": True,
+            "value": is_positive,
         }
+
+        logger.info("Feedback sent & flushed (%s)", "positive" if is_positive else "negative")
+
     except Exception as e:
-        logger.error(f"Error sending feedback: {str(e)}")
+        logger.exception("Error sending feedback: %s", e)
+
 
 @st.cache_data
 def get_welcome_message() -> str:
@@ -760,11 +776,11 @@ def setup_logging():
     """Configure logging to write to both console and file."""
     log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG,  # force DEBUG to see your [DEBUG] lines
         format=log_format,
         handlers=[
             logging.FileHandler("insurance_chatbot.log"),
-            logging.StreamHandler()
+            logging.StreamHandler(sys.stdout)  # use sys.stdout explicitly
         ]
     )
 
@@ -783,6 +799,7 @@ def get_user_context(user_info):
         .set("premium", user_info["premium"]) \
         .set("policy_start", user_info["policy_start"]) \
         .set("policy_end", user_info["policy_end"]) \
+        .set("seed", user_info.get("seed", SEED)) \
         .build()
 
 # Run the app when this file is executed directly
