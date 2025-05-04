@@ -417,8 +417,11 @@ def main():
                     "claims_number": 2,
                     "policy_type": "Auto",
                     "coverage_level": "Premium",
-                    "deductible": 500,
-                    "premium": 1200,
+                    "deductible": 350.0,
+                    "premium": 1242.10,
+                    "outstanding_claim_no": "432-FFAI2-3AG",
+                    "outstanding_claim_amt": 3523.42,
+                    "outstanding_claim_status": "Pending",
                     "policy_start": "2023-01-01",
                     "policy_end": "2024-01-01"
                 }
@@ -448,6 +451,9 @@ def main():
                     "coverage_level": st.session_state.temp_coverage_level,
                     "deductible": st.session_state.temp_deductible,
                     "premium": st.session_state.temp_premium,
+                    "outstanding_claim_no": st.session_state.temp_outstanding_claim_no,
+                    "outstanding_claim_amt": st.session_state.temp_outstanding_claim_amt,
+                    "outstanding_claim_status": st.session_state.temp_outstanding_claim_status,
                     "policy_start": st.session_state.temp_policy_start,
                     "policy_end": st.session_state.temp_policy_end
                 }
@@ -473,8 +479,13 @@ def main():
                 st.selectbox("Coverage Level", options=["Basic", "Standard", "Premium", "Elite"], 
                            index=["Basic", "Standard", "Premium", "Elite"].index(st.session_state.saved_user_info["coverage_level"]), 
                            key="temp_coverage_level")
-                st.number_input("Deductible Amount ($)", 0, 10000, value=st.session_state.saved_user_info["deductible"], key="temp_deductible")
-                st.number_input("Premium ($)", 0, 10000, value=st.session_state.saved_user_info["premium"], key="temp_premium")
+                st.number_input("Deductible Amount ($)", 0.0, 10000.0, value=st.session_state.saved_user_info["deductible"], key="temp_deductible")
+                st.number_input("Premium ($)", 0.0, 10000.0, value=st.session_state.saved_user_info["premium"], key="temp_premium")
+                st.text_input("Outstanding Claim No.", value=st.session_state.saved_user_info["outstanding_claim_no"], key="temp_oustanding_claim_no")
+                st.number_input("Outstanding Claim Amt. ($)", 0.0, 40000.0, value=st.session_state.saved_user_info["outstanding_claim_amt"], key="temp_outstanding_claim_amt")
+                st.selectbox("Outstanding Claim Status", options=["Pending", "Approved", "Rejected"], 
+                           index=["Pending", "Approved", "Rejected"].index(st.session_state.saved_user_info["outstanding_claim_status"]), 
+                           key="outstanding_claim_status")
                 st.text_input("Policy Start Date (YYYY-MM-DD)", value=st.session_state.saved_user_info["policy_start"], key="temp_policy_start")
                 st.text_input("Policy End Date (YYYY-MM-DD)", value=st.session_state.saved_user_info["policy_end"], key="temp_policy_end")
                 
@@ -491,6 +502,9 @@ def main():
                         .set("coverage_level", st.session_state.temp_coverage_level) \
                         .set("deductible", st.session_state.temp_deductible) \
                         .set("premium", st.session_state.temp_premium) \
+                        .set("outstanding_claim_no", st.session_state.temp_outstanding_claim_no)\
+                        .set("outstanding_claim_amt", st.session_state.temp_outstanding_claim_amt)\
+                        .set("outstanding_claim_status", st.session_state.temp_outstanding_claim_status)\
                         .set("policy_start", st.session_state.temp_policy_start) \
                         .set("policy_end", st.session_state.temp_policy_end) \
                         .set("seed", SEED) \
@@ -512,6 +526,9 @@ def main():
                 .set("coverage_level", st.session_state.saved_user_info["coverage_level"]) \
                 .set("deductible", st.session_state.saved_user_info["deductible"]) \
                 .set("premium", st.session_state.saved_user_info["premium"]) \
+                .set("outstanding_claim_no", st.session_state.saved_user_info["outstanding_claim_no"]) \
+                .set("outstanding_claim_amt", st.session_state.saved_user_info["outstanding_claim_amt"]) \
+                .set("outstanding_claim_status", st.session_state.saved_user_info["outstanding_claim_status"]) \
                 .set("policy_start", st.session_state.saved_user_info["policy_start"]) \
                 .set("policy_end", st.session_state.saved_user_info["policy_end"]) \
                 .set("seed", SEED) \
@@ -796,6 +813,9 @@ def get_user_context(user_info):
         .set("policy_type", user_info["policy_type"]) \
         .set("coverage_level", user_info["coverage_level"]) \
         .set("deductible", user_info["deductible"]) \
+        .set("outstanding_claim_no", user_info["outstanding_claim_no"]) \
+        .set("outstanding_claim_amt", user_info["outstanding_claim_amt"]) \
+        .set("outstanding_claim_status", user_info["outstanding_claim_status"]) \
         .set("premium", user_info["premium"]) \
         .set("policy_start", user_info["policy_start"]) \
         .set("policy_end", user_info["policy_end"]) \
